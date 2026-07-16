@@ -1,0 +1,87 @@
+local player = game.Players.LocalPlayer
+local coreGui = game:GetService("CoreGui")
+local runService = game:GetService("RunService")
+local targetParent = (gethui and gethui()) or coreGui
+
+-- 既存のESPを掃除
+if targetParent:FindFirstChild("IyanRainbowESP") then
+    targetParent.IyanRainbowESP:Destroy()
+end
+
+local sg = Instance.new("ScreenGui", targetParent)
+sg.Name = "IyanRainbowESP"
+sg.IgnoreGuiInset = true
+
+-- --- 1. 虹色（RGB）管理ロジック ---
+local rgb = Color3.new(1, 1, 1)
+runService.RenderStepped:Connect(function()
+    local t = tick()
+    rgb = Color3.fromHSV(t % 5 / 5, 1, 1)
+end)
+
+-- --- 2. ESP作成ロジック ---
+local function createESP(targetPlayer)
+    if targetPlayer == player then return end
+
+    local function apply()
+        local char = targetPlayer.Character or targetPlayer.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart", 10)
+        local head = char:WaitForChild("Head", 10)
+        if not hrp or not head then return end
+
+        -- ビジュアルコンテナ（BillboardGui）
+        local bgui = Instance.new("BillboardGui", sg)
+        bgui.Name = targetPlayer.Name
+        bgui.Adornee = head
+        bgui.Size = UDim2.new(0, 100, 0, 150)
+        bgui.StudsOffset = Vector3.new(0, 3, 0)
+        bgui.AlwaysOnTop = true
+
+        -- 表示名 & ユーザー名
+        local nameLabel = Instance.new("TextLabel", bgui)
+        nameLabel.Size = UDim2.new(1, 0, 0.2, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextSize = 14
+        nameLabel.TextStrokeTransparency = 0
+        
+        -- アイコン表示
+        local icon = Instance.new("ImageLabel", bgui)
+        icon.Size = UDim2.new(0, 40, 0, 40)
+        icon.Position = UDim2.new(0.5, -20, -0.4, 0)
+        icon.BackgroundTransparency = 1
+        icon.Image = "rbxthumb://type=AvatarHeadShot&id=" .. targetPlayer.UserId .. "&w=150&h=150"
+        Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
+
+        -- 枠線（Highlight）
+        local highlight = Instance.new("Highlight", char)
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+
+        -- 更新ループ
+        local conn
+        conn = runService.RenderStepped:Connect(function()
+            if not char.Parent or not targetPlayer.Parent then
+                bgui:Destroy()
+                highlight:Destroy()
+                conn:Disconnect()
+                return
+            end
+            nameLabel.Text = targetPlayer.DisplayName .. "\n(@" .. targetPlayer.Name .. ")"
+            nameLabel.TextColor3 = rgb
+            highlight.OutlineColor = rgb
+            highlight.FillColor = rgb
+            icon.BorderColor3 = rgb
+        end)
+    end
+
+    targetPlayer.CharacterAdded:Connect(apply)
+    if targetPlayer.Character then apply() end
+end
+
+-- 全員に適用
+for _, p in pairs(game.Players:GetPlayers()) do createESP(p) end
+game.Players.PlayerAdded:Connect(createESP)
+
+print("IYAN RAINBOW ESP LOADED. 世界を虹色に暴け！")
